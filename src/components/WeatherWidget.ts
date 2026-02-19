@@ -1,8 +1,6 @@
 import { fetchWeatherHistory, fetchWeatherReadings } from '../api/weather';
-import { formatCityTime } from '../utils/formatting';
-import type { CityReading, Reading } from '../types';
+import type { CityReading } from '../types';
 
-// Use environment variable or fallback for local dev
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 export function setupWeatherWidget(displayContainer: HTMLDivElement) {
@@ -16,8 +14,12 @@ export function setupWeatherWidget(displayContainer: HTMLDivElement) {
     }
 
     const rows = data.map(city => {
-      const latest: Reading | undefined = city.readings[city.readings.length - 1];
-      if (!latest) {
+      const localTimestamp = city.features?.[0] ?? null;
+      const tempC = city.features?.[1] ?? null;
+      const tempF = city.features?.[2] ?? null;
+      const timezone = city.timezone;
+      
+      if (!localTimestamp || tempC === null || tempF === null) {
         return `<tr class="error-row">
           <td>${city.city}</td>
           <td>-</td>
@@ -25,12 +27,29 @@ export function setupWeatherWidget(displayContainer: HTMLDivElement) {
           <td>-</td>
         </tr>`;
       }
+      
+      const offsetMatch = localTimestamp.match(/([+-]\d{2}:\d{2})$/);
+      let offsetStr = '';
+      if (offsetMatch) {
+        const offset = offsetMatch[1];
+        const sign = offset[0];
+        const hours = offset.slice(1, 3);
+        offsetStr = ` UTC${sign}${hours}`;
+      }
+      
+      const formattedTime = new Date(localTimestamp).toLocaleTimeString('en-US', {
+          timeZone: timezone,
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true
+        }) + offsetStr;
+      
       return `
         <tr>
           <td>${city.city}</td>
-          <td>${latest.tempC ?? '-'}</td>
-          <td>${latest.tempF ?? '-'}</td>
-          <td>${formatCityTime(latest.localTime, latest.timezone)}</td>
+          <td>${tempC}</td>
+          <td>${tempF}</td>
+          <td>${formattedTime}</td>
         </tr>
       `;
     }).join('');
@@ -38,13 +57,12 @@ export function setupWeatherWidget(displayContainer: HTMLDivElement) {
     let formattedTime = "Unknown";
 
     const lastCity = data[data.length - 1];
-    const lastReading = lastCity?.readings[lastCity.readings.length - 1];
+    const lastLocalTimestamp = lastCity?.features?.[0] ?? null;
 
-    if (lastReading?.localTime) {
-      const date = new Date(lastReading.localTime);
-
+    if (lastLocalTimestamp) {
+      const date = new Date(lastLocalTimestamp);
       if (!isNaN(date.getTime())) {
-        formattedTime = date.toLocaleTimeString([], {
+        formattedTime = date.toLocaleTimeString('en-US', {
           hour: 'numeric',
           minute: '2-digit',
           hour12: true
@@ -84,7 +102,6 @@ export function setupWeatherWidget(displayContainer: HTMLDivElement) {
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Unknown error';
       
-      // Handle specific authentication errors
       if (errorMsg.includes('API key') || errorMsg.includes('401') || errorMsg.includes('403')) {
         displayContainer.innerHTML = `
           <p style="color:red">Authentication Error: ${errorMsg}</p>
@@ -103,18 +120,16 @@ export function setupWeatherWidget(displayContainer: HTMLDivElement) {
     }
   };
 
-  // --- CLOCK-ALIGNED RENDER ---
   function scheduleRender() {
     const now = new Date();
     const delay = (60 - now.getSeconds()) * 1000 - now.getMilliseconds();
 
     setTimeout(function tick() {
       if (latestData) renderTable(latestData);
-      setTimeout(tick, 60_000); // schedule next minute render
+      setTimeout(tick, 60_000);
     }, delay);
   }
 
-  // --- PREFETCH SCHEDULER (fetch ~10s early) ---
   const PREFETCH_MS = 10_000;
 
   function nextPrefetchTime(): number {
@@ -130,20 +145,18 @@ export function setupWeatherWidget(displayContainer: HTMLDivElement) {
     const delay = Math.max(0, nextTime - Date.now());
 
     setTimeout(() => {
-      fetchData(); // fetch early so data is ready by minute boundary
-      schedulePrefetch(nextTime + 60_000); // schedule next prefetch
+      fetchData();
+      schedulePrefetch(nextTime + 60_000);
     }, delay);
   }
 
-async function loadHistory() {
-  const history = await fetchWeatherHistory();
-  renderTable(history);
-}
+  async function loadHistory() {
+    const history = await fetchWeatherHistory();
+    renderTable(history);
+  }
 
-
-  // --- STARTUP ---
   loadHistory();
-  fetchData();       // initial prefetch
-  schedulePrefetch(); // recursive prefetching
-  scheduleRender();   // clock-aligned rendering
+  fetchData();
+  schedulePrefetch();
+  scheduleRender();
 }

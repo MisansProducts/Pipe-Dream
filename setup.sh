@@ -23,10 +23,6 @@ API_KEY=dev_weather_api_key_secure_change_me_later_2024
 
 # --- CORS Origins ---
 CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000
-
-# --- External Services ---
-OPEN_METEO_URL=https://api.open-meteo.com/v1/forecast
-REFRESH_INTERVAL_MINUTES=1
 EOF
 else
     echo "backend/.env already exists - skipping"
@@ -52,10 +48,6 @@ CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000
 
 # --- Database Configuration (inherits from main .env) ---
 # These settings will be read from the main .env file
-
-# --- External Services ---
-OPEN_METEO_URL=https://api.open-meteo.com/v1/forecast
-REFRESH_INTERVAL_MINUTES=1
 EOF
 else
     echo "backend/.env.local already exists - skipping"
