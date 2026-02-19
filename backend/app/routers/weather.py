@@ -12,7 +12,7 @@ router = APIRouter()
 def get_weather():
     """
     Get current weather readings for all cities.
-    Returns the last 10 readings for each city.
+    Returns the latest reading for each city.
     """
     try:
         logger.info("Weather data requested")
